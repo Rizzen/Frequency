@@ -6,22 +6,23 @@ using System.Diagnostics;
 public class threeSidesCover : MonoBehaviour {
 
 
-	//Vector3 [] covering = {new Vector3(0,0,0),new Vector3(0,0,1),new Vector3(-1,0,1),new Vector3(1,0,1),new Vector3(-1,0,2),new Vector3(0,0,2),new Vector3(1,0,2),new Vector3(-1,0,3),new Vector3(0,0,3),new Vector3(1,0,3),new Vector3(-1,0,4),new Vector3(0,0,4),new Vector3(1,0,4),new Vector3(0,0,5),new Vector3(1,0,-2),new Vector3(2,0,-2),new Vector3(3,0,-2),new Vector3(1,0,-3),new Vector3(2,0,-3),new Vector3(3,0,-3),new Vector3(4,0,-3),new Vector3(1,0,-4),new Vector3(2,0,-4),new Vector3(3,0,-4),new Vector3(4,0,-4),new Vector3(2,0,-5),new Vector3(3,0,-5),new Vector3(4,0,-5),new Vector3(-1,0,-2),new Vector3(-2,0,-2),new Vector3(-3,0,-2),new Vector3(-1,0,-3),new Vector3(-2,0,-3),new Vector3(-3,0,-3),new Vector3(-4,0,-3),new Vector3(-1,0,-4),new Vector3(-2,0,-4),new Vector3(-3,0,-4),new Vector3(-4,0,-4),new Vector3(-2,0,-5),new Vector3(-3,0,-5),new Vector3(-4,0,-5)};
-	private RaycastHit currhit;
+
+	private Collider currHit;
 	private bool casted;
 	private int layMask = 1<<8;
 	private int LM = 1 << 10;
-	private int[] distances = {2,4,6};
+	public int[] distances = {2,4,6};
 	private bool wasCovered;
 	private int strength;
 	private bool OnMouse = false;
 	private NewCommutation commutation;
 
+	private float angleBetween;
+
 
 	//
-	private RaycastHit[] hits1 = new RaycastHit[0];
-	private RaycastHit[] hits2 = new RaycastHit[0];
-	private RaycastHit[] hits3 = new RaycastHit[0];
+	private Collider[] hits = new Collider[0];
+
 	// покрытие через 
 
 	int calcStrength(float distance) //расчет силы покрытия
@@ -43,94 +44,53 @@ public class threeSidesCover : MonoBehaviour {
 	void calcCover()
 	{
 		if (!wasCovered) {
-			//hits1 = Physics.OverlapCapsule (transform.position, 5f, -1);
-			hits1 = Physics.CapsuleCastAll (transform.position, transform.position+ new Vector3 (-6f,0,-6f),1f,transform.forward);
-			for (int i = 0; i < hits1.Length; i++) {
-				currhit = hits1 [i];
-				if (currhit.transform.GetComponent<NodeMaterial> () != null && !Physics.Linecast (transform.position, currhit.transform.position, layMask)) {
-					strength = calcStrength (Vector3.Distance (transform.position, currhit.transform.position));
+			hits = Physics.OverlapSphere (transform.position, 12f, -1);
+			for (int i = 0; i < hits.Length; i++) {
+				currHit = hits [i];
+				if (currHit.transform.GetComponent<NodeMaterial> () != null && !Physics.Linecast (transform.position, currHit.transform.position, layMask)) {
 
-
-					//print (CalcAngle.calcAngleBetween(transform.position, transform.position + Vector3.forward, transform.position, currhit.transform.position));
-					//print (Vector3.Angle(currhit.transform.position,transform.position)*Mathf.Rad2Deg);
-
-					//print (CalcAngle.AngleSighned (dirToNode, transform.forward,transform.forward));
-					//print (CalcAngle.angle360(dirToNode,transform.forward, Vector3.right));
-
-
-					currhit.transform.SendMessage ("Cover", strength);
-				}
-			}
-
-
-			hits2 = Physics.CapsuleCastAll (transform.position, transform.position+ new Vector3 (0,0,7f),1.1f,transform.forward);
-			for (int i = 0; i < hits2.Length; i++) {
-				currhit = hits2 [i];
-				if (currhit.transform.GetComponent<NodeMaterial> () != null && !Physics.Linecast (transform.position, currhit.transform.position, layMask)) {
-					strength = calcStrength (Vector3.Distance (transform.position, currhit.transform.position));
-					//тестовая часть
-
-
-					Vector3 dirToNode = (currhit.transform.position - transform.position);
-					if (currhit.transform.position.x < transform.position.x) {
-						print (360f - Vector3.Angle (transform.forward, dirToNode));
+					Vector3 dirToNode = (currHit.transform.position - transform.position);
+					if (currHit.transform.position.x < transform.position.x) {
+						angleBetween = 360f - Vector3.Angle (transform.forward, dirToNode);
+						//print (angleBetween);
 					} else {
-						print (Vector3.Angle (transform.forward, dirToNode));
+						angleBetween = Vector3.Angle (transform.forward, dirToNode);
+						//print (angleBetween);
 					}
-					//Vector3 dirToNode = (currhit.transform.position - transform.position);
-					//print (360f - Vector3.Angle (transform.forward,dirToNode));
-					//print (Vector3.Angle(transform.position,currhit.transform.position));
 
-					//конец теста
-
-					currhit.transform.SendMessage ("Cover", strength);
-				}
-			}
-
-			hits3 = Physics.CapsuleCastAll (transform.position, transform.position + new Vector3 (6,0,-6f),1f,transform.forward);
-			for (int i = 0; i < hits3.Length; i++) {
-				currhit = hits3 [i];
-				if (currhit.transform.GetComponent<NodeMaterial> () != null && !Physics.Linecast (transform.position, currhit.transform.position, layMask)) {
-					strength = calcStrength (Vector3.Distance (transform.position, currhit.transform.position));
-					currhit.transform.SendMessage ("Cover", strength);
+					if ((angleBetween >= 340f && angleBetween <= 360f) || (angleBetween >= 0f && angleBetween <= 20f) || (angleBetween >= 105f && angleBetween <= 145f) || (angleBetween >= 215f && angleBetween <= 255f)) {
+						strength = calcStrength (Vector3.Distance (transform.position, currHit.transform.position));
+						currHit.SendMessage ("Cover", strength);
+					}
 				}
 			}
 		}
 		wasCovered = true;
 	}
 
-
-
 	//вычисляем покрытие, которое надо убрать
 	void calcUnCover()
 	{ 
 		if (wasCovered) {
-			//hits1 = Physics.OverlapCapsule (transform.position, 5f, -1);
-			hits1 = Physics.CapsuleCastAll (transform.position, transform.position+ new Vector3 (-6f,0,-6f),1f,transform.forward);
-			for (int i = 0; i < hits1.Length; i++) {
-				currhit = hits1 [i];
-				if (currhit.transform.GetComponent<NodeMaterial> () != null && !Physics.Linecast (transform.position, currhit.transform.position, layMask)) {
-					strength = calcStrength (Vector3.Distance (transform.position, currhit.transform.position));
-					currhit.transform.SendMessage ("UnCover", strength);
-				}
-			}
+			hits = Physics.OverlapSphere (transform.position, 12f, -1);
 
+			for (int i = 0; i < hits.Length; i++) {
+				Collider currHit = hits [i];
+				if (currHit.transform.GetComponent<NodeMaterial> () != null && !Physics.Linecast (transform.position, currHit.transform.position, layMask)) {
 
-			hits2 = Physics.CapsuleCastAll (transform.position, transform.position+ new Vector3 (0,0,7f),1.1f,transform.forward);
-			for (int i = 0; i < hits2.Length; i++) {
-				currhit = hits2 [i];
-				if (currhit.transform.GetComponent<NodeMaterial> () != null && !Physics.Linecast (transform.position, currhit.transform.position, layMask)) {
-					strength = calcStrength (Vector3.Distance (transform.position, currhit.transform.position));
-					currhit.transform.SendMessage ("UnCover", strength);
-				}
-			}
+					Vector3 dirToNode = (currHit.transform.position - transform.position);
+					if (currHit.transform.position.x < transform.position.x) {
+						angleBetween = 360f - Vector3.Angle (transform.forward, dirToNode);
+						//print (angleBetween);
+					} else {
+						angleBetween = Vector3.Angle (transform.forward, dirToNode);
+						//print (angleBetween);
+					}
 
-			hits3 = Physics.CapsuleCastAll (transform.position, transform.position+ new Vector3 (6,0,-6f),1f,transform.forward);
-			for (int i = 0; i < hits3.Length; i++) {
-				currhit = hits3 [i];
-				if (currhit.transform.GetComponent<NodeMaterial> () != null && !Physics.Linecast (transform.position, currhit.transform.position, layMask)) {
-					strength = calcStrength (Vector3.Distance (transform.position, currhit.transform.position));
-					currhit.transform.SendMessage ("UnCover", strength);
+					if ((angleBetween >= 340f && angleBetween <= 360f) || (angleBetween >= 0f && angleBetween <= 20f) || (angleBetween >= 105f && angleBetween <= 145f) || (angleBetween >= 215f && angleBetween <= 255f)) {
+						strength = calcStrength (Vector3.Distance (transform.position, currHit.transform.position));
+						currHit.SendMessage ("UnCover", strength);
+					}
 				}
 			}
 		}
