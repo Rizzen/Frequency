@@ -4,23 +4,24 @@ using System.Collections.Generic;
 
 public class NewCommutation : MonoBehaviour {
 	
-	public bool connected = false;
+	public bool online = false;
+	public LayerMask obstacleMask;
 	//стейты
 	private enum State
 	{
 		Disconnected, Connecting, Connected, Dragging
 	}
-	private State prevState;
-	private State state;
+	private State prevState; // для хранения прошлого стейта
+	private State state; //текущий стейт
 
 	private Transform connectedTo = null;
+	private FoWCovering coveringScript; //кэш для кавер-скрипта
+	private List<Transform> connectedList = new List<Transform>(); // лист подключенных к данной станции
 
-	private List<Transform> connectedList = new List<Transform>();
-	private LineRenderer line;
-	private Vector3[] positions;
+	private LineRenderer line; //кэш для рисования линии
+	private Vector3[] positions; //позиции для линии
+
 	private bool OnMouse = false;
-	bool connecting = false;
-	private RayCastCovering coveringScript;
 	bool dragging = false;
 
 
@@ -32,7 +33,7 @@ public class NewCommutation : MonoBehaviour {
 		DisConnect ();
 		//действие по входу в стейт
 		setState(State.Disconnected);
-		//print ("StateDisconnected ON");
+		print ("StateDisconnected ON");
 
 	}
 
@@ -44,7 +45,7 @@ public class NewCommutation : MonoBehaviour {
 			DisConnect ();
 		}
 		setState(State.Connecting);
-		//print ("StateConnecting ON");
+		print ("StateConnecting ON");
 	}
 
 	void stateConnected (Transform target)
@@ -54,14 +55,14 @@ public class NewCommutation : MonoBehaviour {
 		setState(State.Connected);
 		Connect (target);
 		DrawConnection (target);
-		//print ("StateConnected ON");
+		print ("StateConnected ON");
 	}
 
 	void stateDragging ()
 	{
 		setState (State.Dragging);
 		//действие по входу в стейт
-		//print ("StateDragging On");
+		print ("StateDragging On");
 	}
 
 	void setState (State value)
@@ -138,7 +139,7 @@ public class NewCommutation : MonoBehaviour {
 			}
 		}
 		print (connectedList.Count);
-		//эта функция вызывается извне, отключающейся станцией
+		//эта функция вызывается извне, отключающейся станцией и убирает ее из списка подключенных станции-родителя
 	}
 
 	void SetConnectedTo (Transform _connectedTo)
@@ -151,17 +152,18 @@ public class NewCommutation : MonoBehaviour {
 		connectedTo = null;
 	}
 
+
+
 	void Status (bool _connected, Transform _connectedTo)
 	{
 		//Обновление статуса подключения и станции, к которой подключены
-		connected = _connected;
-		if (connected) {
-			transform.SendMessage ("calcCover");
-			//coveringScript.calcCover ();
+		online = _connected;
+
+		if (online) {
+			coveringScript.DrawFieldOfView (coveringScript.viewAngle, coveringScript.zeroAngle);
 			DrawConnection (_connectedTo);
 		} else {
-			transform.SendMessage ("calcUnCover");
-			//coveringScript.calcUnCover ();
+			coveringScript.UnDraw ();
 			deleteLine ();
 		}
 	}
@@ -171,10 +173,10 @@ public class NewCommutation : MonoBehaviour {
 	void UpdateConnectionList()
 	{
 		if (connectedList.Count > 0) {
-			print (connectedList.Count);
+			//print (connectedList.Count);
 			for (int i = 0; i < connectedList.Count; i++) {
 				NewCommutation newCommutation = connectedList [i].transform.GetComponent<NewCommutation> ();
-				newCommutation.Status (connected, transform);
+				newCommutation.Status (online, transform);
 				if (newCommutation.connectedList.Count > 0) {
 					newCommutation.UpdateConnectionList ();
 				}
@@ -189,8 +191,10 @@ public class NewCommutation : MonoBehaviour {
 		commutation.AddConnection (transform);
 		SetConnectedTo (target);
 
-		if (commutation.connected != connected) {
-			Status (commutation.connected, _hit.transform);
+		if (commutation.online != online) {
+			//если у нас статус не одинаков, то меняем
+			//без этой проверки при закольцевании возникает бесконечный цикл
+			Status (commutation.online, _hit.transform);
 			UpdateConnectionList ();
 		}
 
@@ -236,11 +240,7 @@ public class NewCommutation : MonoBehaviour {
 	#region Start&Update
 	void Start () {
 		positions = new Vector3[2];
-		//if (transform.GetComponent<RayCastCovering> () != null) {
-			//coveringScript = transform.GetComponent<RayCastCovering> ();
-		//} else if (transform.GetComponent<threeSidesCover> () != null) {
-		//	coveringScript = (RayCastCovering)transform.GetComponent<threeSidesCover> ();
-		//}
+		coveringScript = transform.GetComponent<FoWCovering>();
 		line = transform.GetComponentInChildren<LineRenderer> ();
 
 	}
@@ -250,13 +250,29 @@ public class NewCommutation : MonoBehaviour {
 		
 		//ОБНОВЛЕНИЕ ЛИНИЙ ПРИ ПЕРЕТАСКИВАНИИ
 		if (dragging) {
+			
+			if (state == State.Connected && online) 
+			{
+				bool thereIsObstacle = CheckObstacles (transform.position, connectedTo.position);
+				if (!thereIsObstacle) {
+					coveringScript.DrawFieldOfView (coveringScript.viewAngle, coveringScript.zeroAngle);
+				}
+			}
+			if (state == State.Connected && CheckObstacles (transform.position, connectedTo.position))
+			{
+				stateDisconnected ();
+			}
 			if (connectedList.Count > 0) {
 				for (int i = 0; i < connectedList.Count; i++) {
 					connectedList [i].GetComponent<NewCommutation> ().UpdateLine (transform);
 				}
 			}
 		}
-		//ЛКМ ВНЕ НОДЫ
+
+
+
+
+		//ЛКМ ВНЕ НОДЫ или по ноде - уточняем проверкой что под курсором
 		if (Input.GetButtonDown ("Fire1")) {
 			switch (state) 
 			{
@@ -264,8 +280,13 @@ public class NewCommutation : MonoBehaviour {
 				RaycastHit hit;
 				Ray ray = Camera.main.ScreenPointToRay (Input.mousePosition);
 				if (Physics.Raycast (ray, out hit) && hit.transform.GetComponent<NewCommutation> () != null && hit.transform!=transform) {
-					stateConnected (hit.transform);
-					SetConnectedTo (hit.transform);
+					if (!CheckObstacles (transform.position, hit.transform.position)) { // если в прямой видимости
+						stateConnected (hit.transform);
+						SetConnectedTo (hit.transform);
+					}
+					else {
+						stateDisconnected ();
+					}
 				} else {
 					stateDisconnected ();
 				}
@@ -337,5 +358,12 @@ public class NewCommutation : MonoBehaviour {
 		}
 
 	#endregion
+
+
+	public bool CheckObstacles (Vector3 pointA, Vector3 pointB)
+	{
+		// true если препятствия есть
+		return Physics.Linecast (pointA, pointB, obstacleMask); 
+	}
 
 }
