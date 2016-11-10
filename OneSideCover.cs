@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+//ВЫБРОШЕНО
+using UnityEngine;
 using System.Collections;
 
 public class OneSideCover : MonoBehaviour {
