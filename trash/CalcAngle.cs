@@ -2,7 +2,7 @@
 using System.Collections;
 
 public class CalcAngle : MonoBehaviour {
-
+	//исключительно для 2D
 	public static float calcAngleBetween (Vector3 firstOrigin, Vector3 firstEnd, Vector3 secondOrigin, Vector3 secondEnd)
 	{
 		Vector3 firstCoordinates = new Vector3 (firstEnd.x - firstOrigin.x, firstEnd.y - firstOrigin.y, firstEnd.z - firstOrigin.z); 
